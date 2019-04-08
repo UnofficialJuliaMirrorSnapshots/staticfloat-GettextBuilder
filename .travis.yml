@@ -1,0 +1,56 @@
+language: julia
+os:
+  - linux
+julia:
+  - 0.6
+notifications:
+  email: false
+git:
+  depth: 99999999
+cache:
+  timeout: 1000
+  directories:
+    - downloads
+env:
+  global:
+    - BINARYBUILDER_DOWNLOADS_CACHE=downloads
+    - BINARYBUILDER_AUTOMATIC_APPLE=true
+  # Our build takes too long for one job, so split targets across multiple jobs
+  matrix:
+    - TARGET=x86_64-linux-gnu
+    - TARGET=i686-linux-gnu
+    - TARGET=aarch64-linux-gnu
+    - TARGET=arm-linux-gnueabihf
+    - TARGET=powerpc64le-linux-gnu
+    - TARGET=x86_64-apple-darwin14
+   # Windows disabled for now
+   #- TARGET=x86_64-w64-mingw32
+   #- TARGET=i686-w64-mingw32
+sudo: required
+
+jobs:
+  include:
+    - stage: regenerate build.jl
+      script: julia --color=yes build_tarballs.jl --only-buildjl
+      if: tag IS present
+
+# Before anything else, get the latest versions of things
+before_script:
+  - julia -e 'Pkg.clone("https://github.com/JuliaPackaging/BinaryProvider.jl")'
+  - julia -e 'Pkg.clone("https://github.com/JuliaPackaging/BinaryBuilder.jl"); Pkg.build()'
+
+script:
+  - julia build_tarballs.jl $TARGET
+
+deploy:
+  provider: releases
+  api_key:
+    # Note; this api_key is only valid for staticfloat/GettextBuilder; you need
+    # to make your own: https://docs.travis-ci.com/user/deployment/releases/
+    secure: e9bOIaVPX4/KNiAmi+V1fJQIdIsqgXzvlY8QtmE8KXKCwHOox3COsKsBLETcD4ip9RF1jtwcjDKLKMNEg/0cGW5DnzsQgZWwg+O1CIXiniCtakF7djSO63V9mBxI7PO+aYWa4CqCxkpd1GRKnGy2r6j5zrYl0f7PTYVjw61pCdppcVqHHATffZCCRNMO6ocSIBRTja4TT+sPLq0EFLbd3UyoZECydWIoeS5lIOT4ZSJ95KHqmrdhgR7nMh206nygUSvKPFs91xjwqzXVvcwKLzkVNNX6R4tMNmCUdf+/RBY96BpzkIwAJUdy0kbi3MzG6GUvlRxOTMEZdJF+Iu5UibQ2xkq7SNwrQUzFrWu66tlQA7PQb3dlf15thVQiVrsv6V0ktCIMXdkLFAl7IDKDlWU+XN5P6l1YRTCRjcWE9o5i7T6/yaacB0rTw9gwR5MKj5K+ExusJRUrQqZkjrGb/s4Txs8Csf46xGp3P4V6oj31Nnj+ErbyyydKUyAcOTqnLqDN8gezC7NcZYaec1BdUyVgNFmvqyKRZ77CgkS4rsI7W7wDZJR/Pid6AfqiWPpm0J7jUaF+OkS4NWNyN03figT3T+d5lCVJaUQ/rTATcOcWA5Nj9tjYbz6nHA8aOqBC6h9/e34I5owFiehIJyaJ0u9r4OVj4jiOkMDa41Ejx+g= 
+  file_glob: true
+  file: products/*
+  skip_cleanup: true
+  on:
+    repo: staticfloat/GettextBuilder
+    tags: true
